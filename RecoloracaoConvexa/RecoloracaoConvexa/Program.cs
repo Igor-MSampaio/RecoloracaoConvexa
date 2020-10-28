@@ -8,11 +8,11 @@ namespace RecoloracaoConvexa
 {
     class Program
     {
-        public static void Main(string[] args)
+        public static void Main2(string[] args)
         {
             try
             {
-                var instancia = "rand_10_7";
+                var instancia = "rand_10_3";
                 StreamReader file = File.OpenText(@"Instancias\" + instancia + ".txt");
                 string[] words = file.ReadLine().Split(' ');
                 int nVertices = int.Parse(words[0]);
@@ -27,6 +27,7 @@ namespace RecoloracaoConvexa
                     caminhoColorido.Add(int.Parse(line));
                 }
 
+                int limiteSuperior = Heuristica(caminhoColorido, nCores);
 
                 var stopwatch = new Stopwatch();
                 stopwatch.Start();
@@ -34,13 +35,11 @@ namespace RecoloracaoConvexa
                 // Criação e inicialização do ambiente.
                 GRBEnv env = new GRBEnv(true);
                 env.Set("LogFile", "Recoloracao.log");
-                env.Set(GRB.IntParam.LogToConsole, 0);
                 env.Start();
 
                 // Criação do modelo vazio a partir do ambiente.
                 GRBModel model = new GRBModel(env);
                 model.ModelName = "Recoloracao";
-                model.Parameters.TimeLimit = 1800.00;
 
                 // Variáveis do modelo.
 
@@ -72,6 +71,7 @@ namespace RecoloracaoConvexa
                         soma.AddTerm(1.0, X[i, c]);
 
                     model.AddConstr(soma, GRB.EQUAL, 1, "Cor vértice" + i);
+                    model.AddConstr(soma, GRB.GREATER_EQUAL, 0, "Cor vértice" + i);
                 }
 
                 // Restrição 2
@@ -103,6 +103,7 @@ namespace RecoloracaoConvexa
                 Console.WriteLine($"Tempo total: {stopwatch.Elapsed}");
                 Console.WriteLine("----------------------------------------------------------------------------------------");
 
+
                 model.Dispose();
                 env.Dispose();
             }
@@ -111,6 +112,75 @@ namespace RecoloracaoConvexa
                 Console.WriteLine("Código do erro: " + e.ErrorCode + ". " + e.Message + " - " + DateTime.Now);
                 throw;
             }
+        }
+
+        public static int Heuristica(List<int> caminhoColorido, int nCores)
+        {
+            List<int> contCores = new List<int>();
+
+            for (int i = 0; i < nCores; i++)
+            {
+                contCores.Add(0);
+            }
+
+            foreach (var item in caminhoColorido)
+            {
+                contCores[item - 1]++;
+            }
+
+            int corMaior = 0;
+            int contMaior = 0;
+
+            for (int i = 0; i < contCores.Count; i++)
+            {
+                if (contMaior < contCores[i])
+                {
+                    contMaior = contCores[i];
+                    corMaior = i;
+                }
+                else if (contMaior == contCores[i])
+                {
+                    if (caminhoColorido[0] == corMaior + 1 && caminhoColorido[caminhoColorido.Count - 1] == corMaior + 1)
+                    {
+                        contMaior = contCores[i];
+                        corMaior = i;
+                    }
+                    else if (caminhoColorido[0] == corMaior + 1 || caminhoColorido[caminhoColorido.Count - 1] == corMaior + 1)
+                    {
+                        if (caminhoColorido[0] == i + 1 || caminhoColorido[caminhoColorido.Count - 1] == i + 1)
+                        {
+                            continue;
+                        }
+                        else
+                        {
+                            contMaior = contCores[i];
+                            corMaior = i;
+                        }
+                    }
+                }
+            }
+
+            int naoTroca = 0;
+            int corIni = caminhoColorido[0];
+            int corFim = caminhoColorido[caminhoColorido.Count - 1];
+
+            foreach (var item in caminhoColorido)
+            {
+                if ((item - 1) == corMaior || item != corIni)
+                    break;
+                else
+                    naoTroca++;
+            }
+
+            for (int i = caminhoColorido.Count - 1; i >= 0; i--)
+            {
+                if ((caminhoColorido[i] - 1) == corMaior || caminhoColorido[i] != corFim || corIni == corFim)
+                    break;
+                else
+                    naoTroca++;
+            }
+
+            return (caminhoColorido.Count - contMaior - naoTroca);
         }
     }
 }
